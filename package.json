@@ -1,0 +1,10 @@
+{
+  "name": "physio-study",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Syllabus-first medical learning workspace with midterm and final modes",
+  "license": "MIT",
+  "engines": {"node": ">=20"},
+  "scripts": {"start": "node server.mjs", "dev": "node server.mjs", "test": "node --test", "check": "node --check server.mjs && node --check dist/app.js && node --check dist/core.js && node --check dist/course.js"}
+}

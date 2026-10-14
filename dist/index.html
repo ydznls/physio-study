@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#173e38">
+  <meta name="description" content="按课程大纲学习生理学：期中与期末双模式，知识点、讲义、练习和学习记录。">
+  <title>生理学学习台 · Physio Study</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到学习内容</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="#overview"><span class="brand-icon">P<span>+</span></span><span>生理学学习台<small>PHYSIO STUDY</small></span></a>
+      <div class="workspace-label">我的学习空间 <span>01</span></div>
+      <nav id="navigation"></nav>
+      <div class="sidebar-course"><span class="eyebrow">当前课程</span><strong>生理学 A</strong><p>第 10 版 · 大纲驱动</p><div class="course-status"><i></i> 2026 秋季学期</div></div>
+      <div class="sidebar-bottom"><span class="local-dot"></span>学习记录保存在此浏览器<button id="backup-side" class="text-button">备份数据 ↗</button></div>
+    </aside>
+    <div class="page-shell">
+      <header class="topbar"><div class="breadcrumb">学习空间 <span>/</span> <strong id="page-label">总览</strong></div><div class="topbar-actions"><span class="mode-description" id="mode-description"></span><div class="mode-switch" role="group" aria-label="考试模式"><button data-mode="midterm">期中</button><button data-mode="final">期末</button></div><button class="icon-button" id="theme-toggle" aria-label="切换深色模式">◐</button><span class="avatar">学</span></div></header>
+      <main id="main" tabindex="-1"></main>
+      <footer>按大纲学 · 用理解连接知识 <span>Physio Study / v0.1</span></footer>
+    </div>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="confirm-dialog"><h2 id="confirm-title">确认操作</h2><p id="confirm-copy"></p><div class="button-row"><button id="confirm-cancel" class="button secondary">取消</button><button id="confirm-ok" class="button">确定</button></div></dialog>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

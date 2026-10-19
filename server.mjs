@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import {normalizeConnection,modelRequest,modelError} from './dist/core.js';
 const root=path.dirname(fileURLToPath(import.meta.url));
 try {
   const env=await readFile(path.join(root,'.env'),'utf8');
@@ -35,14 +36,23 @@ export async function handle(req,res){
       const tmp=await mkdtemp(path.join(os.tmpdir(),'physio-study-'));
       try{const f=path.join(tmp,'upload.'+ext);await writeFile(f,input);const result=await parseDocument(f,ext);json(res,200,result);}finally{await rm(tmp,{recursive:true,force:true});}return;
     }
+    if(url.pathname==='/api/test-connection'&&req.method==='POST'){
+      const x=JSON.parse((await body(req)).toString()),key=x.apiKey||process.env.AI_API_KEY;
+      if(!key)return json(res,400,{error:'请填写 API Key。'});
+      const {baseUrl,model}=normalizeConnection(x.baseUrl||process.env.AI_BASE_URL,x.model||process.env.AI_MODEL,{local:true});
+      const r=await fetch(baseUrl+'/models',{headers:{Authorization:`Bearer ${key}`},redirect:'error',signal:AbortSignal.timeout(20000)});
+      const data=await r.json().catch(()=>null);if(!r.ok)return json(res,502,{error:modelError(r.status,data,key)});
+      if(!Array.isArray(data?.data))throw new Error('服务未返回有效的模型列表。');
+      return json(res,200,{models:data.data.map(m=>m.id).filter(id=>typeof id==='string'),model});
+    }
     if(url.pathname==='/api/generate'&&req.method==='POST'){
       const x=JSON.parse((await body(req)).toString());const key=x.apiKey||process.env.AI_API_KEY;
       if(!key)return json(res,400,{error:'请先在设置中填写API Key，或在服务端.env配置。'});
-      const base=validateProvider(x.baseUrl||process.env.AI_BASE_URL||'');const model=x.model||process.env.AI_MODEL;
+      const {baseUrl:base,model}=normalizeConnection(x.baseUrl||process.env.AI_BASE_URL||'',x.model||process.env.AI_MODEL,{local:true});
       if(!model||!Array.isArray(x.messages)||x.messages.length!==2||x.messages[0]?.role!=='system'||x.messages[1]?.role!=='user')return json(res,400,{error:'模型或讲义请求无效。'});
-      const r=await fetch(base+'/chat/completions',{method:'POST',redirect:'error',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model,messages:x.messages,temperature:0.2,max_tokens:6500}),signal:AbortSignal.timeout(120000)});
-      if(!r.ok)return json(res,502,{error:`模型服务返回HTTP ${r.status}。请检查服务地址、模型、额度与密钥。`});
-      const y=await r.json();const content=y.choices?.[0]?.message?.content;if(typeof content!=='string'||!content.trim())throw new Error('模型返回空内容。');return json(res,200,{content,model,usage:y.usage||null});
+      const r=await fetch(base+'/chat/completions',{method:'POST',redirect:'error',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify(modelRequest(base,model,x.messages)),signal:AbortSignal.timeout(180000)});
+      const y=await r.json().catch(()=>null);if(!r.ok)return json(res,502,{error:modelError(r.status,y,key)});
+      const content=y?.choices?.[0]?.message?.content;if(typeof content!=='string'||!content.trim())throw new Error('模型没有返回讲义正文，请检查模型参数后重试。');if(y.choices[0].finish_reason==='length')throw new Error('本次输出达到长度上限，未保存不完整讲义，请缩小资料范围后重试。');return json(res,200,{content,model,usage:y.usage||null});
     }
     if(url.pathname.startsWith('/api/'))return json(res,404,{error:'接口不存在。'});
     if(!['GET','HEAD'].includes(req.method))return json(res,405,{error:'方法不支持。'});
@@ -53,5 +63,5 @@ export async function handle(req,res){
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const port=Number(process.env.PORT||4189),host=process.env.HOST||'127.0.0.1';
-  const server=http.createServer(handle);server.requestTimeout=150000;server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`端口 ${port} 已被占用，请在 .env 修改 PORT。`:e.message);process.exitCode=1;});server.listen(port,host,()=>console.log(`Local: http://${host}:${port}`));
+  const server=http.createServer(handle);server.requestTimeout=195000;server.on('error',e=>{console.error(e.code==='EADDRINUSE'?`端口 ${port} 已被占用，请在 .env 修改 PORT。`:e.message);process.exitCode=1;});server.listen(port,host,()=>console.log(`Local: http://${host}:${port}`));
 }

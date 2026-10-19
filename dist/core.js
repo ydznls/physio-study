@@ -1,6 +1,30 @@
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 export const inScope = (chapter, mode) => chapter.id <= (mode === 'midterm' ? 5 : 11);
 export const scopedChapters = (chapters, mode) => chapters.filter(c => inScope(c, mode));
+export function normalizeConnection(base,model,{local=false}={}) {
+  let u;try{u=new URL(String(base||'').trim());}catch{throw new Error('请填写完整的 API 地址，例如 https://api.deepseek.com');}
+  if(u.username||u.password||u.search||u.hash)throw new Error('API 地址不能包含密钥、参数或片段。');
+  const deepseek=u.hostname==='api.deepseek.com';
+  if(deepseek&&u.protocol==='http:')u.protocol='https:';
+  if(u.protocol!=='https:'&&!(local&&u.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(u.hostname)))throw new Error('在线连接需要 https:// 地址；本机 HTTP 模型请使用本地服务。');
+  if(['chat.deepseek.com','platform.deepseek.com'].includes(u.hostname))throw new Error('这是 DeepSeek 网页地址。API 地址应填写 https://api.deepseek.com');
+  u.pathname=u.pathname.replace(/\/+$/,'').replace(/\/chat\/completions$/,'');
+  let name=String(model||'').trim();
+  if(deepseek){if(!['/','/v1'].includes(u.pathname))throw new Error('DeepSeek API 根地址请使用 https://api.deepseek.com');if(!name||['v4-flash','deepseek-v4-flash'].includes(name))name='deepseek-flash';if(name==='v4-pro')name='deepseek-v4-pro';}
+  if(!name)throw new Error('请填写模型名称，DeepSeek 可点击预设自动填写。');
+  return {baseUrl:u.href.replace(/\/$/,''),model:name};
+}
+export function modelRequest(baseUrl,model,messages) {
+  const deepseek=new URL(baseUrl).hostname==='api.deepseek.com';
+  return {model,messages,stream:false,max_tokens:deepseek?12000:6500,...(deepseek?{thinking:{type:'disabled'}}:{temperature:.2})};
+}
+export function modelError(status,data,key='') {
+  const tips={400:'请求参数或模型名不正确。DeepSeek 可点击预设修复模型名称。',401:'API Key 无效或已失效，请重新填写。',402:'API 账户余额不足，请检查 DeepSeek 开放平台余额。',403:'密钥没有访问权限，或服务拒绝了此请求。',404:'接口路径或模型不存在，请核对 API 根地址与模型名。',422:'模型不接受当前请求参数。',429:'调用过于频繁或触及额度，请稍后手动重试。',500:'模型服务暂时出错，请稍后重试。',503:'模型服务繁忙，请稍后重试。'};
+  let detail=typeof data?.error==='string'?data.error:typeof data?.error?.message==='string'?data.error.message:'';
+  if(key)detail=detail.split(key).join('[已隐藏密钥]');
+  detail=detail.replace(/\bsk-[A-Za-z0-9_-]+/g,'[已隐藏密钥]').slice(0,600);
+  return `HTTP ${status}：${tips[status]||'模型请求失败，请检查服务设置。'}${detail?' 服务详情：'+detail:''}`;
+}
 export function getProgress(chapters, progress, mode) {
   const topics = scopedChapters(chapters, mode).flatMap(c => c.topics);
   const completed = topics.filter(t => progress[t.id] === 'mastered').length;
